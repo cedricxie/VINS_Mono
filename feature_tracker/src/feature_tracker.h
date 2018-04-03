@@ -30,7 +30,7 @@ class FeatureTracker
   public:
     FeatureTracker();
 
-    void readImage(const cv::Mat &_img,double _cur_time);
+    void readImage(const cv::Mat &_img);
 
     void setMask();
 
@@ -44,22 +44,16 @@ class FeatureTracker
 
     void rejectWithF();
 
-    void undistortedPoints();
+    vector<cv::Point2f> undistortedPoints();
 
     cv::Mat mask;
     cv::Mat fisheye_mask;
     cv::Mat prev_img, cur_img, forw_img;
     vector<cv::Point2f> n_pts;
     vector<cv::Point2f> prev_pts, cur_pts, forw_pts;
-    vector<cv::Point2f> prev_un_pts, cur_un_pts;
-    vector<cv::Point2f> pts_velocity;
     vector<int> ids;
-    vector<int> track_cnt;
-    map<int, cv::Point2f> cur_un_pts_map;
-    map<int, cv::Point2f> prev_un_pts_map;
+    vector<int> track_cnt; //代表当前cur_ptrs被追踪的时间次数
     camodocal::CameraPtr m_camera;
-    double cur_time;
-    double prev_time;
 
     static int n_id;
 };
