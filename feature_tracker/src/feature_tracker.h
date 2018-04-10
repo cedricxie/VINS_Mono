@@ -51,6 +51,9 @@ class FeatureTracker
     cv::Mat prev_img, cur_img, forw_img;
     vector<cv::Point2f> n_pts;
     vector<cv::Point2f> prev_pts, cur_pts, forw_pts;
+    // prev_pts: previously published frame
+    // cur_pts: previous frame
+    // forw_pt: latest frame
     vector<int> ids;
     vector<int> track_cnt; //代表当前cur_ptrs被追踪的时间次数
     camodocal::CameraPtr m_camera;

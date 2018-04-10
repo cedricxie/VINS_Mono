@@ -43,8 +43,12 @@ FeatureTracker::FeatureTracker()
 
 /**
  * @brief 对图像使用光流法进行特征点跟踪
- * 
+ *
  * 按照被追踪到的次数排序，然后加上mask去掉部分点，主要是针对鱼眼相机
+ *
+ * 在mask图像中将追踪到点的地方设置为0，否则为255，目的是为了下面做特
+ * 征点检测的时候可以选择没有特征点的区域进行检测。在同一区域内，追踪到
+ * 次数最多的点会被保留，其他的点会被删除
 */
 void FeatureTracker::setMask()
 {
@@ -52,7 +56,7 @@ void FeatureTracker::setMask()
         mask = fisheye_mask.clone();
     else
         mask = cv::Mat(ROW, COL, CV_8UC1, cv::Scalar(255));
-    
+
 
     // prefer to keep features that are tracked for long time
     vector<pair<int, pair<cv::Point2f, int>>> cnt_pts_id;
@@ -63,7 +67,7 @@ void FeatureTracker::setMask()
     sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<cv::Point2f, int>> &a, const pair<int, pair<cv::Point2f, int>> &b)
          {
             return a.first > b.first;
-         });
+         }); // sort based on track_cnt
 
     forw_pts.clear();
     ids.clear();
@@ -77,7 +81,7 @@ void FeatureTracker::setMask()
             ids.push_back(it.second.second);
             track_cnt.push_back(it.first);
             cv::circle(mask, it.second.first, MIN_DIST, 0, -1);
-        }
+        } // MIN_DIST is the min distance between two features
     }
 }
 
@@ -97,7 +101,7 @@ void FeatureTracker::addPoints()
 
 /**
  * @brief 对新来的图像使用光流法进行特征点跟踪
- * 
+ *
  * optional: 使用createCLAHE对图像进行自适应直方图均衡化
  * calcOpticalFlowPyrLK() LK金字塔光流法
  * 设置mask，在setMask()函数中
@@ -111,7 +115,8 @@ void FeatureTracker::readImage(const cv::Mat &_img)
 
     if (EQUALIZE)
     {
-        //使用createCLAHE对图像进行自适应直方图均衡化
+        // 使用createCLAHE对图像进行自适应直方图均衡化
+        // if image is too dark or light, trun on equalize to find enough features
         cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
         TicToc t_c;
         clahe->apply(_img, img);
@@ -136,7 +141,7 @@ void FeatureTracker::readImage(const cv::Mat &_img)
         TicToc t_o;
         vector<uchar> status;
         vector<float> err;
-        //calcOpticalFlowPyrLK() LK金字塔光流法 
+        //calcOpticalFlowPyrLK() LK金字塔光流法 (同时会去除那些无法追踪到的特征点)
         //ref: https://docs.opencv.org/3.1.0/d7/d8b/tutorial_py_lucas_kanade.html
         cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3);
 
@@ -295,6 +300,9 @@ void FeatureTracker::showUndistortion(const string &name)
 
 /**
  * @breif undistortedPoints Points
+ *
+ * liftProjective: Lift points from the image plane to the projective space.
+ * spaceToPlane: Projects 3D points to the image plane (Pi function)
 */
 vector<cv::Point2f> FeatureTracker::undistortedPoints()
 {

@@ -23,7 +23,7 @@ bool first_image_flag = true;
 
 /**
  * @brief ROS的图像回调函数，对新来的图像进行特征点追踪，发布
- * 
+ *
  * 使用createCLAHE对图像进行自适应直方图均衡化
  * calcOpticalFlowPyrLK() LK金字塔光流法，生成tracking的特征点
  * undistroted特征点
@@ -60,9 +60,8 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         ROS_DEBUG("processing camera %d", i);
         if (i != 1 || !STEREO_TRACK)
             trackerData[i].readImage(ptr->image.rowRange(ROW * i, ROW * (i + 1)));
-        else
+        else //双目
         {
-            //双目
             if (EQUALIZE)
             {
                 cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
@@ -96,7 +95,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             if (r_status[i])
             {
                 idx.push_back(i);
-                //undistortion  
+                //undistortion
                 Eigen::Vector3d tmp_p;
                 trackerData[0].m_camera->liftProjective(Eigen::Vector2d(trackerData[0].cur_pts[i].x, trackerData[0].cur_pts[i].y), tmp_p);
                 tmp_p.x() = FOCAL_LENGTH * tmp_p.x() / tmp_p.z() + COL / 2.0;
@@ -123,7 +122,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
                 r_cnt += r_status[idx[i]];
             }
         }
-    }
+    } // end of 双目
 
     //更新全局ID
     for (unsigned int i = 0;; i++)
@@ -172,9 +171,9 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
                     ROS_ASSERT(inBorder(cur_pts[j]));
                 }
             }
+            //双目
             else if (STEREO_TRACK)
             {
-                //双目
                 auto r_un_pts = trackerData[1].undistortedPoints();
                 auto &ids = trackerData[0].ids;
                 for (unsigned int j = 0; j < ids.size(); j++)
@@ -200,6 +199,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         ROS_DEBUG("publish %f, at %f", feature_points->header.stamp.toSec(), ros::Time::now().toSec());
         pub_img.publish(feature_points);
 
+        //显示追踪状态
         if (SHOW_TRACK)
         {
             ptr = cv_bridge::cvtColor(ptr, sensor_msgs::image_encodings::BGR8);
@@ -213,7 +213,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
                 cv::cvtColor(show_img, tmp_img, CV_GRAY2RGB);
                 if (i != 1 || !STEREO_TRACK)
                 {
-                    //显示追踪状态，越红越好，越蓝越不行
+                    //越红越好，越蓝越不行
                     for (unsigned int j = 0; j < trackerData[i].cur_pts.size(); j++)
                     {
                         double len = std::min(1.0, 1.0 * trackerData[i].track_cnt[j] / WINDOW_SIZE);
@@ -241,7 +241,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             cv::waitKey(5);
             */
             pub_match.publish(ptr->toImageMsg());
-        }
+        } // end of 显示追踪状态
     }
     ROS_INFO("whole feature tracker processing costs: %f", t_r.toc());
 }
