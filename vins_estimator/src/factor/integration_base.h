@@ -53,7 +53,7 @@ class IntegrationBase
     }
 
     //中值积分法，具体推导参考:https://www.zhihu.com/question/64381223/answer/255818747
-    void midPointIntegration(double _dt, 
+    void midPointIntegration(double _dt,
                             const Eigen::Vector3d &_acc_0, const Eigen::Vector3d &_gyr_0,
                             const Eigen::Vector3d &_acc_1, const Eigen::Vector3d &_gyr_1,
                             const Eigen::Vector3d &delta_p, const Eigen::Quaterniond &delta_q, const Eigen::Vector3d &delta_v,
@@ -70,7 +70,7 @@ class IntegrationBase
         result_delta_p = delta_p + delta_v * _dt + 0.5 * un_acc * _dt * _dt;
         result_delta_v = delta_v + un_acc * _dt;
         result_linearized_ba = linearized_ba;
-        result_linearized_bg = linearized_bg;         
+        result_linearized_bg = linearized_bg;
 
         if(update_jacobian)
         {
@@ -90,16 +90,17 @@ class IntegrationBase
                 a_1_x(2), 0, -a_1_x(0),
                 -a_1_x(1), a_1_x(0), 0;
 
+            // 离散状态下误差状态方程
             MatrixXd F = MatrixXd::Zero(15, 15);
             F.block<3, 3>(0, 0) = Matrix3d::Identity();
-            F.block<3, 3>(0, 3) = -0.25 * delta_q.toRotationMatrix() * R_a_0_x * _dt * _dt + 
+            F.block<3, 3>(0, 3) = -0.25 * delta_q.toRotationMatrix() * R_a_0_x * _dt * _dt +
                                   -0.25 * result_delta_q.toRotationMatrix() * R_a_1_x * (Matrix3d::Identity() - R_w_x * _dt) * _dt * _dt;
             F.block<3, 3>(0, 6) = MatrixXd::Identity(3,3) * _dt;
             F.block<3, 3>(0, 9) = -0.25 * (delta_q.toRotationMatrix() + result_delta_q.toRotationMatrix()) * _dt * _dt;
             F.block<3, 3>(0, 12) = -0.25 * result_delta_q.toRotationMatrix() * R_a_1_x * _dt * _dt * -_dt;
             F.block<3, 3>(3, 3) = Matrix3d::Identity() - R_w_x * _dt;
             F.block<3, 3>(3, 12) = -1.0 * MatrixXd::Identity(3,3) * _dt;
-            F.block<3, 3>(6, 3) = -0.5 * delta_q.toRotationMatrix() * R_a_0_x * _dt + 
+            F.block<3, 3>(6, 3) = -0.5 * delta_q.toRotationMatrix() * R_a_0_x * _dt +
                                   -0.5 * result_delta_q.toRotationMatrix() * R_a_1_x * (Matrix3d::Identity() - R_w_x * _dt) * _dt;
             F.block<3, 3>(6, 6) = Matrix3d::Identity();
             F.block<3, 3>(6, 9) = -0.5 * (delta_q.toRotationMatrix() + result_delta_q.toRotationMatrix()) * _dt;
@@ -158,8 +159,8 @@ class IntegrationBase
         delta_q.normalize();
         sum_dt += dt;
         acc_0 = acc_1;
-        gyr_0 = gyr_1;  
-     
+        gyr_0 = gyr_1;
+
     }
 
     Eigen::Matrix<double, 15, 1> evaluate(const Eigen::Vector3d &Pi, const Eigen::Quaterniond &Qi, const Eigen::Vector3d &Vi, const Eigen::Vector3d &Bai, const Eigen::Vector3d &Bgi,
@@ -226,9 +227,9 @@ class IntegrationBase
         Vector3d omg = _gyr_1 - linearized_bg;
         omg = omg * _dt / 2;
         Quaterniond dR(1, omg(0), omg(1), omg(2));
-        result_delta_q = (delta_q * dR);   
+        result_delta_q = (delta_q * dR);
         result_linearized_ba = linearized_ba;
-        result_linearized_bg = linearized_bg;         
+        result_linearized_bg = linearized_bg;
 
         if(update_jacobian)
         {
@@ -278,10 +279,10 @@ class IntegrationBase
             covariance = F * covariance * F.transpose() + V * noise * V.transpose();
         }
 
-    }     
+    }
 
 
-    void checkJacobian(double _dt, const Eigen::Vector3d &_acc_0, const Eigen::Vector3d &_gyr_0, 
+    void checkJacobian(double _dt, const Eigen::Vector3d &_acc_0, const Eigen::Vector3d &_gyr_0,
                                    const Eigen::Vector3d &_acc_1, const Eigen::Vector3d &_gyr_1,
                             const Eigen::Vector3d &delta_p, const Eigen::Quaterniond &delta_q, const Eigen::Vector3d &delta_v,
                             const Eigen::Vector3d &linearized_ba, const Eigen::Vector3d &linearized_bg)

@@ -173,10 +173,10 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
                 ROS_ASSERT(fabs(jacobian_speedbias_j.maxCoeff()) < 1e8);
                 ROS_ASSERT(fabs(jacobian_speedbias_j.minCoeff()) < 1e8);
             }
-        }
+        } // (jacobians)
 
         return true;
-    }
+    } // virtual bool Evaluate
 
     //bool Evaluate_Direct(double const *const *parameters, Eigen::Matrix<double, 15, 1> &residuals, Eigen::Matrix<double, 15, 30> &jacobians);
 
@@ -186,4 +186,3 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
     IntegrationBase* pre_integration;
 
 };
-

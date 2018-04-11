@@ -92,7 +92,7 @@ void Estimator::processIMU(double dt, const Vector3d &linear_acceleration, const
         linear_acceleration_buf[frame_count].push_back(linear_acceleration);
         angular_velocity_buf[frame_count].push_back(angular_velocity);
 
-        int j = frame_count;         
+        int j = frame_count;
         //noise是zero mean Gassu，在这里忽略了
         Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
         //下面都采用的是中值积分的传播方式，noise被忽略了
@@ -147,7 +147,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Vector3d>>> &image,
                 ESTIMATE_EXTRINSIC = 1;
             }
         }
-    }
+    } // if(ESTIMATE_EXTRINSIC == 2)
 
     if (solver_flag == INITIAL)
     {
@@ -171,14 +171,14 @@ void Estimator::processImage(const map<int, vector<pair<int, Vector3d>>> &image,
                 last_P = Ps[WINDOW_SIZE];
                 last_R0 = Rs[0];
                 last_P0 = Ps[0];
-                
+
             }
             else
                 slideWindow();
         }
         else
             frame_count++;
-    }
+    } // if (solver_flag == INITIAL)
     else
     {
         TicToc t_solve;
@@ -255,7 +255,7 @@ bool Estimator::initialStructure()
     Quaterniond Q[frame_count + 1];
     Vector3d T[frame_count + 1];
     map<int, Vector3d> sfm_tracked_points;
-    
+
     //特征点对应的3D feature
     vector<SFMFeature> sfm_f;
     for (auto &it_per_id : f_manager.feature)
@@ -271,17 +271,17 @@ bool Estimator::initialStructure()
             tmp_feature.observation.push_back(make_pair(imu_j, Eigen::Vector2d{pts_j.x(), pts_j.y()}));
         }
         sfm_f.push_back(tmp_feature);
-    } 
+    }
     Matrix3d relative_R;
     Vector3d relative_T;
     int l;
-    //2.选择跟最后一帧中有足够多特征点和视差的某一帧，利用五点法恢复相对旋转和平移量 
+    //2.选择跟最后一帧中有足够多特征点和视差的某一帧，利用五点法恢复相对旋转和平移量
     if (!relativePose(relative_R, relative_T, l))
     {
         ROS_INFO("Not enough features or parallax; Move device around");
         return false;
     }
-    //3.全局SFM初始化全部初始帧中的相机位置和特征点空间3D位置 
+    //3.全局SFM初始化全部初始帧中的相机位置和特征点空间3D位置
     GlobalSFM sfm;
     if(!sfm.construct(frame_count + 1, Q, T, l,
               relative_R, relative_T,
@@ -341,7 +341,7 @@ bool Estimator::initialStructure()
                 }
             }
         }
-        cv::Mat K = (cv::Mat_<double>(3, 3) << 1, 0, 0, 0, 1, 0, 0, 0, 1);     
+        cv::Mat K = (cv::Mat_<double>(3, 3) << 1, 0, 0, 0, 1, 0, 0, 0, 1);
         if(pts_3_vector.size() < 6)
         {
             //cout << "pts_3_vector size " << pts_3_vector.size() << endl;
@@ -454,7 +454,7 @@ bool Estimator::visualInitialAlign()
         Vs[i] = rot_diff * Vs[i];
     }
     ROS_DEBUG_STREAM("g0     " << g.transpose());
-    ROS_DEBUG_STREAM("my R0  " << Utility::R2ypr(Rs[0]).transpose()); 
+    ROS_DEBUG_STREAM("my R0  " << Utility::R2ypr(Rs[0]).transpose());
 
     return true;
 }
@@ -656,7 +656,7 @@ bool Estimator::failureDetection()
     if (abs(tmp_P.z() - last_P.z()) > 1)
     {
         ROS_INFO(" big z translation");
-        return true; 
+        return true;
     }
     Matrix3d tmp_R = Rs[WINDOW_SIZE];
     Matrix3d delta_R = tmp_R.transpose() * last_R;
@@ -705,10 +705,17 @@ void Estimator::optimization()
     TicToc t_whole, t_prepare;
     vector2double();
 
-    //添加marginalization的residual，这个marginalization的结构是始终存在的，随着下面marginazation的结构更新，last_marginalization_parameter_blocks对应的是还在sliding window的变量
-    //关于这一部分的理解，请看heyijia大神的BLOG:http://blog.csdn.net/heyijia0327/article/details/53707261,可能是说的最清楚的一个了
-    //这里可以这样理解，下面会添加对IMU和视觉的残差，但是，这些对应的变量实际上跟之前被margin掉的变量是有约束的，这里的last_marginalization_parameter_blocks就是保存的这些变量，也就是heyijia博客中对应的Xb变量，
-    //last_marginalization_info中对应的是Xb对应的测量Zb，这里用先验来表示这个约束，整个margin部分实际上就是在维护这个结构：
+    // 添加marginalization的residual，这个marginalization的结构是始终存在的，
+    // 随着下面marginazation的结构更新，last_marginalization_parameter_blocks
+    // 对应的是还在sliding window的变量
+    // 关于这一部分的理解，请看heyijia大神的BLOG:
+    // http://blog.csdn.net/heyijia0327/article/details/53707261
+    // 可能是说的最清楚的一个了
+    // 这里可以这样理解，下面会添加对IMU和视觉的残差，但是，这些对应的变量实际上跟之前
+    // 被margin掉的变量是有约束的，这里的last_marginalization_parameter_blocks
+    // 就是保存的这些变量，也就是heyijia博客中对应的Xb变量，
+    // last_marginalization_info中对应的是Xb对应的测量Zb，这里用先验来表示这个约束，
+    // 整个margin部分实际上就是在维护这个结构：
     if (last_marginalization_info)
     {
         // construct new marginlization_factor
@@ -716,7 +723,7 @@ void Estimator::optimization()
         problem.AddResidualBlock(marginalization_factor, NULL,
                                  last_marginalization_parameter_blocks);
     }
-    
+
     //这里IMU项和camera项之间是有一个系数，这个系数就是他们各自的协方差矩阵：IMU的协方差是预积分的协方差(IMUFactor::Evaluate，中添加IMU协方差，求解jacobian矩阵)，而camera的测量残差则是一个固定的系数（f/1.5）
     //添加IMU的residual
     for (int i = 0; i < WINDOW_SIZE; i++)
@@ -735,11 +742,11 @@ void Estimator::optimization()
         it_per_id.used_num = it_per_id.feature_per_frame.size();
         if (!(it_per_id.used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
             continue;
- 
+
         ++feature_index;
 
         int imu_i = it_per_id.start_frame, imu_j = imu_i - 1;
-        
+
         Vector3d pts_i = it_per_id.feature_per_frame[0].point;
 
         for (auto &it_per_frame : it_per_id.feature_per_frame)
@@ -762,7 +769,7 @@ void Estimator::optimization()
     {
         int loop_constraint_num = 0;
         for (int k = 0; k < (int)retrive_data_vector.size(); k++)
-        {    
+        {
             for(int i = 0; i < WINDOW_SIZE; i++)
             {
                 if(retrive_data_vector[k].header == Headers[i].stamp.toSec())
@@ -783,7 +790,7 @@ void Estimator::optimization()
                         ++feature_index;
                         int start = it_per_id.start_frame;
                         if(start <= i)
-                        {   
+                        {
                             while(retrive_data_vector[k].features_ids[retrive_feature_index] < it_per_id.feature_id)
                             {
                                 retrive_feature_index++;
@@ -793,20 +800,20 @@ void Estimator::optimization()
                             {
                                 Vector3d pts_j = Vector3d(retrive_data_vector[k].measurements[retrive_feature_index].x, retrive_data_vector[k].measurements[retrive_feature_index].y, 1.0);
                                 Vector3d pts_i = it_per_id.feature_per_frame[0].point;
-                                
+
                                 ProjectionFactor *f = new ProjectionFactor(pts_i, pts_j);
                                 problem.AddResidualBlock(f, loss_function, para_Pose[start], retrive_data_vector[k].loop_pose, para_Ex_Pose[0], para_Feature[feature_index]);
-                            
+
                                 retrive_feature_index++;
-                            }     
+                            }
                         }
                     }
-                            
+
                 }
-            }
-        }
+            } // for i
+        } // for k
         ROS_DEBUG("loop constraint num: %d", loop_constraint_num);
-    }
+    } // if(LOOP_CLOSURE)
     ROS_DEBUG("visual measurement count: %d", f_m_cnt);
     ROS_DEBUG("prepare for ceres: %f", t_prepare.toc());
 
@@ -832,7 +839,7 @@ void Estimator::optimization()
 
     // relative info between two loop frame
     if(LOOP_CLOSURE && relocalize)
-    { 
+    {
         for (int k = 0; k < (int)retrive_data_vector.size(); k++)
         {
             for(int i = 0; i< WINDOW_SIZE; i++)
@@ -852,22 +859,27 @@ void Estimator::optimization()
                     retrive_data_vector[k].relative_yaw = Utility::normalizeAngle(Utility::R2ypr(Rs_i).x() - Utility::R2ypr(Rs_loop).x());
                     if (abs(retrive_data_vector[k].relative_yaw) > 30.0 || retrive_data_vector[k].relative_t.norm() > 20.0)
                         retrive_data_vector[k].relative_pose = false;
-                        
+
                 }
-            } 
-        } 
+            }
+        }
     }
 
     double2vector();
 
     TicToc t_whole_marginalization;
-    //margin部分，如果倒数第二帧是关键帧：
-    //1.把之前的存的残差部分加进来
-    //2.把与当前要margin掉帧所有相关的残差项都加进来，IMU,vision
-    //3.preMarginalize-> 调用Evaluate计算所有ResidualBlock的残差，parameter_block_data parameter_block_idx parameter_block_size是marinazation中存参数块的容器(unordered_map),key都是addr,
-    //分别对应这些参数的data，在稀疏矩阵A中的index(要被margin掉的参数会被移到前面)，A中的大小
-    //4.Marginalize->多线程构造Hx=b的结构，H是边缘化后的结果，First Esitimate Jacobian,在X0处线性化
-    //5.margin结束，调整参数块在下一次window中对应的位置（往前移一格），注意这里是指针，后面slideWindow中会赋新值，这里只是提前占座（知乎上有人问：https://www.zhihu.com/question/63754583/answer/259699612）
+    // margin部分，如果倒数第二帧是关键帧：
+    // 1.把之前的存的残差部分加进来
+    // 2.把与当前要margin掉帧所有相关的残差项都加进来，IMU,vision
+    // 3.preMarginalize-> 调用Evaluate计算所有ResidualBlock的残差，
+    //   parameter_block_data parameter_block_idx parameter_block_size
+    //   是marinazation中存参数块的容器(unordered_map),key都是addr,
+    //   分别对应这些参数的data，在稀疏矩阵A中的index(要被margin掉的参数会被移到前面)，A中的大小
+    // 4.Marginalize->多线程构造Hx=b的结构，H是边缘化后的结果，First Esitimate Jacobian,
+    //   在X0处线性化
+    // 5.margin结束，调整参数块在下一次window中对应的位置（往前移一格），注意这里是指针，
+    //   后面slideWindow中会赋新值，这里只是提前占座
+    //  （知乎上有人问：https://www.zhihu.com/question/63754583/answer/259699612）
     if (marginalization_flag == MARGIN_OLD)
     {
         MarginalizationInfo *marginalization_info = new MarginalizationInfo();
@@ -937,7 +949,7 @@ void Estimator::optimization()
         TicToc t_pre_margin;
         marginalization_info->preMarginalize();
         ROS_DEBUG("pre marginalization %f ms", t_pre_margin.toc());
-        
+
         TicToc t_margin;
         marginalization_info->marginalize();
         ROS_DEBUG("marginalization %f ms", t_margin.toc());
@@ -957,7 +969,7 @@ void Estimator::optimization()
             delete last_marginalization_info;
         last_marginalization_info = marginalization_info;
         last_marginalization_parameter_blocks = parameter_blocks;
-        
+
     }
     //如果倒数第二帧不是关键帧
     //1.保留该帧的IMU测量，margin该帧的visual
@@ -999,7 +1011,7 @@ void Estimator::optimization()
             ROS_DEBUG("begin marginalization");
             marginalization_info->marginalize();
             ROS_DEBUG("end marginalization, %f ms", t_margin.toc());
-            
+
             std::unordered_map<long, double *> addr_shift;
             for (int i = 0; i <= WINDOW_SIZE; i++)
             {
@@ -1024,11 +1036,11 @@ void Estimator::optimization()
                 delete last_marginalization_info;
             last_marginalization_info = marginalization_info;
             last_marginalization_parameter_blocks = parameter_blocks;
-            
+
         }
     }
     ROS_DEBUG("whole marginalization costs: %f", t_whole_marginalization.toc());
-    
+
     ROS_DEBUG("whole time for ceres: %f", t_whole.toc());
 }
 
@@ -1148,4 +1160,3 @@ void Estimator::slideWindowOld()
         f_manager.removeBack();
 
 }
-

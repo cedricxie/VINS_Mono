@@ -41,9 +41,9 @@ std::mutex m_keyframe_buf;
 std::mutex m_retrive_data_buf;
 
 double latest_time;
-Eigen::Vector3d tmp_P;
-Eigen::Quaterniond tmp_Q;
-Eigen::Vector3d tmp_V;
+Eigen::Vector3d tmp_P;    // translation
+Eigen::Quaterniond tmp_Q; // rotation (left multiply) from local to world coord.
+Eigen::Vector3d tmp_V;    // velocity
 Eigen::Vector3d tmp_Ba;
 Eigen::Vector3d tmp_Bg;
 Eigen::Vector3d acc_0;
@@ -61,6 +61,7 @@ std_msgs::Header cur_header;
 Eigen::Vector3d relocalize_t{Eigen::Vector3d(0, 0, 0)};
 Eigen::Matrix3d relocalize_r{Eigen::Matrix3d::Identity()};
 
+// 通过IMU的测量值进行tmp_Q，tmp_P，tmp_V预测更新
 void predict(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     double t = imu_msg->header.stamp.toSec();
@@ -232,7 +233,7 @@ void process_loop_detection()
 
     while(LOOP_CLOSURE)
     {
-        KeyFrame* cur_kf = NULL; 
+        KeyFrame* cur_kf = NULL;
         m_keyframe_buf.lock();
         while(!keyframe_buf.empty())
         {
@@ -250,7 +251,7 @@ void process_loop_detection()
             m_keyframedatabase_resample.unlock();
 
             cv::Mat current_image;
-            current_image = cur_kf->image;   
+            current_image = cur_kf->image;
 
             bool loop_succ = false;
             int old_index = -1;
@@ -273,7 +274,7 @@ void process_loop_detection()
                 }
                 ROS_DEBUG("loop succ %d with %drd image", global_frame_cnt, old_index);
                 assert(old_index!=-1);
-                
+
                 Vector3d T_w_i_old, PnP_T_old;
                 Matrix3d R_w_i_old, PnP_R_old;
 
@@ -281,7 +282,7 @@ void process_loop_detection()
                 std::vector<cv::Point2f> measurements_old;
                 std::vector<cv::Point2f> measurements_old_norm;
                 std::vector<cv::Point2f> measurements_cur;
-                std::vector<int> features_id_matched;  
+                std::vector<int> features_id_matched;
                 cur_kf->findConnectionWithOldFrame(old_kf, measurements_old, measurements_old_norm, PnP_T_old, PnP_R_old, m_camera);
                 measurements_cur = cur_kf->measurements_matched;
                 features_id_matched = cur_kf->features_id_matched;
@@ -317,7 +318,7 @@ void process_loop_detection()
                     m_update_visualization.lock();
                     keyframe_database.addLoop(old_index);
                     CameraPoseVisualization* posegraph_visualization = keyframe_database.getPosegraphVisualization();
-                    pubPoseGraph(posegraph_visualization, cur_header);  
+                    pubPoseGraph(posegraph_visualization, cur_header);
                     m_update_visualization.unlock();
                 }
 
@@ -352,7 +353,7 @@ void process_loop_detection()
                     }
                     ostringstream convert;
                     convert << "/home/tony-ws/raw_data/loop_image/"
-                            << cur_kf->global_index << "-" 
+                            << cur_kf->global_index << "-"
                             << old_index << "-" << loop_fusion <<".jpg";
                     cv::imwrite( convert.str().c_str(), loop_match_img);
                     */
@@ -375,11 +376,11 @@ void process_loop_detection()
 
                     ostringstream convert2;
                     convert2 << "/home/tony-ws/raw_data/loop_image/"
-                            << cur_kf->global_index << "-" 
+                            << cur_kf->global_index << "-"
                             << old_index << "-" << loop_fusion <<"-2.jpg";
                     cv::imwrite( convert2.str().c_str(), loop_match_img2);
                 }
-                  
+
             }
             //release memory
             cur_kf->image.release();
@@ -431,7 +432,7 @@ void process_pose_graph()
             CameraPoseVisualization* posegraph_visualization = keyframe_database.getPosegraphVisualization();
             m_update_visualization.unlock();
             pubOdometry(estimator, cur_header, relocalize_t, relocalize_r);
-            pubPoseGraph(posegraph_visualization, cur_header); 
+            pubPoseGraph(posegraph_visualization, cur_header);
             nav_msgs::Path refine_path = keyframe_database.getPath();
             updateLoopPath(refine_path);
         }
@@ -504,7 +505,7 @@ void process()
                 m_retrive_data_buf.unlock();
                 //WINDOW_SIZE - 2 is key frame
                 if(estimator.marginalization_flag == 0 && estimator.solver_flag == estimator.NON_LINEAR)
-                {   
+                {
                     Vector3d vio_T_w_i = estimator.Ps[WINDOW_SIZE - 2];
                     Matrix3d vio_R_w_i = estimator.Rs[WINDOW_SIZE - 2];
                     i_buf.lock();
@@ -517,7 +518,7 @@ void process()
                     // relative_T   i-1_T_i relative_R  i-1_R_i
                     cv::Mat KeyFrame_image;
                     KeyFrame_image = image_buf.front().first;
-                    
+
                     const char *pattern_file = PATTERN_FILE.c_str();
                     Vector3d cur_T;
                     Matrix3d cur_R;
@@ -534,16 +535,16 @@ void process()
                     {
                         if(estimator.Headers[0].stamp.toSec() == estimator.retrive_data_vector[0].header)
                         {
-                            KeyFrame* cur_kf = keyframe_database.getKeyframe(estimator.retrive_data_vector[0].cur_index);                            
+                            KeyFrame* cur_kf = keyframe_database.getKeyframe(estimator.retrive_data_vector[0].cur_index);
                             if (abs(estimator.retrive_data_vector[0].relative_yaw) > 30.0 || estimator.retrive_data_vector[0].relative_t.norm() > 20.0)
                             {
                                 ROS_DEBUG("Wrong loop");
                                 cur_kf->removeLoop();
                             }
-                            else 
+                            else
                             {
-                                cur_kf->updateLoopConnection( estimator.retrive_data_vector[0].relative_t, 
-                                                              estimator.retrive_data_vector[0].relative_q, 
+                                cur_kf->updateLoopConnection( estimator.retrive_data_vector[0].relative_t,
+                                                              estimator.retrive_data_vector[0].relative_q,
                                                               estimator.retrive_data_vector[0].relative_yaw);
                                 m_posegraph_buf.lock();
                                 optimize_posegraph_buf.push(estimator.retrive_data_vector[0].cur_index);
@@ -551,8 +552,8 @@ void process()
                             }
                         }
                     }
-                }
-            }
+                } // if(estimator.marginalization_flag == 0 && estimator.solver_flag == estimator.NON_LINEAR)
+            } // if(LOOP_CLOSURE)
             double whole_t = t_s.toc();
             printStatistics(estimator, whole_t);
             std_msgs::Header header = img_msg->header;
@@ -578,7 +579,7 @@ void process()
             update();
         m_state.unlock();
         m_buf.unlock();
-    }
+    } // while (true)
 }
 
 int main(int argc, char **argv)
@@ -606,7 +607,7 @@ int main(int argc, char **argv)
     if (LOOP_CLOSURE)
     {
         ROS_WARN("LOOP_CLOSURE true");
-        loop_detection = std::thread(process_loop_detection);   
+        loop_detection = std::thread(process_loop_detection);
         pose_graph = std::thread(process_pose_graph);
         m_camera = CameraFactory::instance()->generateCameraFromYamlFile(CAM_NAMES);
     }
