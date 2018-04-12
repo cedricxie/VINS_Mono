@@ -29,9 +29,7 @@ class FeatureTracker
 {
   public:
     FeatureTracker();
-
-    void readImage(const cv::Mat &_img);
-
+    
     void setMask();
 
     void addPoints();

@@ -94,6 +94,7 @@ void predict(const sensor_msgs::ImuConstPtr &imu_msg)
     gyr_0 = angular_velocity;
 }
 
+// update tmp_Q, tmp_P, and tmp_V with imu_buf
 void update()
 {
     TicToc t_predict;
@@ -572,7 +573,7 @@ void process()
             pubTF(estimator, header, relocalize_t, relocalize_r);
             m_loop_drift.unlock();
             //ROS_ERROR("end: %f, at %f", img_msg->header.stamp.toSec(), ros::Time::now().toSec());
-        }
+        } // for (auto &measurement : measurements)
         m_buf.lock();
         m_state.lock();
         if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)

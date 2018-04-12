@@ -213,12 +213,12 @@ void Estimator::processImage(const map<int, vector<pair<int, Vector3d>>> &image,
 
 
 //视觉的结构初始化
-//1.确保IMU有足够的excitation
-//2.选择跟最后一帧中有足够多特征点和视差的某一帧，利用五点法恢复相对旋转和平移量 恢复某两帧
-//3.sfm.construct 全局SFM 恢复滑动窗口的帧的位姿
+//1. 确保IMU有足够的excitation
+//2. 选择跟最后一帧中有足够多特征点和视差的某一帧，利用五点法恢复相对旋转和平移量 恢复某两帧
+//3. sfm.construct 全局SFM 恢复滑动窗口的帧的位姿
 //4. 利用pnp恢复其他帧
-//5.开始初始化，视觉IMU数据对齐
-//6.给滑动窗口中要优化的变量一个合理的初始值以便进行非线性优化
+//5. 开始初始化，视觉IMU数据对齐
+//6. 给滑动窗口中要优化的变量一个合理的初始值以便进行非线性优化
 bool Estimator::initialStructure()
 {
     TicToc t_sfm;
@@ -233,8 +233,10 @@ bool Estimator::initialStructure()
             Vector3d tmp_g = frame_it->second.pre_integration->delta_v / dt;
             sum_g += tmp_g;
         }
+        // calculate average
         Vector3d aver_g;
         aver_g = sum_g * 1.0 / ((int)all_image_frame.size() - 1);
+        // calculate variance
         double var = 0;
         for (frame_it = all_image_frame.begin(), frame_it++; frame_it != all_image_frame.end(); frame_it++)
         {
@@ -462,12 +464,12 @@ bool Estimator::visualInitialAlign()
 //判断两帧有足够视差
 bool Estimator::relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l)
 {
-    // find previous frame which contians enough correspondance and parallex with newest frame
+    // find previous frame which contains enough correspondance and parallex with newest frame
     for (int i = 0; i < WINDOW_SIZE; i++)
     {
         vector<pair<Vector3d, Vector3d>> corres;
         corres = f_manager.getCorresponding(i, WINDOW_SIZE);
-        if (corres.size() > 20)
+        if (corres.size() > 20) // num of corresponding features
         {
             double sum_parallax = 0;
             double average_parallax;
@@ -479,7 +481,7 @@ bool Estimator::relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l)
                 sum_parallax = sum_parallax + parallax;
 
             }
-            average_parallax = 1.0 * sum_parallax / int(corres.size());
+            average_parallax = 1.0 * sum_parallax / int(corres.size()); // calculate parallax
             if(average_parallax * 460 > 30 && m_estimator.solveRelativeRT(corres, relative_R, relative_T))
             {
                 l = i;

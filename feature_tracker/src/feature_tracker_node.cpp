@@ -143,7 +143,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         sensor_msgs::ChannelFloat32 id_of_point;
         sensor_msgs::ChannelFloat32 u_of_point;
         sensor_msgs::ChannelFloat32 v_of_point;
-
+        // header
         feature_points->header = img_msg->header;
         feature_points->header.frame_id = "world";
 
